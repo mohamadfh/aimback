@@ -1,0 +1,117 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+env/
+*.egg-info/
+*.egg
+pip-selfcheck.json
+
+# Django settings and database files
+*.log
+*.pot
+*.pyc
+*.sqlite3
+db.sqlite3
+
+# Static files
+static/
+media/
+
+# Secret key
+secret_key.py
+
+# Development settings (local_settings.py typically)
+local_settings.py
+
+# Site-specific settings (production_settings.py typically)
+production_settings.py
+
+# IDE-specific files
+.idea/
+.vscode/
+
+# Compiled Python files
+*.pyc
+
+# macOS-specific files
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Log files
+logs/
+*.log
+
+# Environment variables
+.env
+
+# Automatically generated coverage reports
+htmlcov/
+
+# Editor-specific temp files
+*~
+
+**/.ipynb_checkpoints*
+**/__pycache*
+**/.vscode
+**/__pycache__/
+# Python-specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.tmp
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Virtual Environment
+venv/
+env/
+*.egg-info/
+dist/
+.build/
+
+# IDE-specific
+.idea/
+.vscode/
+*.swp
+
+# Compiled Python files
+*.pyc
+*.pyo
+*.pyd
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Environment variables
+.env
+
+# User-specific files
+*.suo
+*.user
+*.sln.docstates
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# Linux
+lost+found/
