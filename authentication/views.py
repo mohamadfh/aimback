@@ -4,18 +4,13 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-#from StudyArena.models import Student, Teacher
-from .serializers import UserSerializer
+from core.models import Employee, Manager
+# from StudyArena.models import Student, Teacher
+from .serializers import UserSerializer, UserSafeSerializer, ManagerSafeSerializer
 from .models import CustomUser
 # import utils
-
-
-import io
-import requests
-
-
-#IMAGES_LOCATION = '/var/www/html/'  # TODO: set relative path
+from core.models import Organization
+from core.permissions import IsManager, IsAdmin
 
 
 class SignUp(APIView):
@@ -25,7 +20,9 @@ class SignUp(APIView):
     def post(self, request):
         data = {'username': request.data['username'],
                 'password': request.data['password'],
-                'email': request.data['email']}
+                }
+        if 'admin' in request.data['role']:
+            data['role'] = 'A'
         if 'manager' in request.data['role']:
             data['role'] = 'M'
         if 'employee' in request.data['role']:
@@ -33,17 +30,9 @@ class SignUp(APIView):
         user = UserSerializer(data=data)
         if user.is_valid():
             user = user.save()
-            response = requests.post('http://127.0.0.1:8000/auth/login/',
-                                     data={'username': user.username, 'password': request.data.get('password', '')})
-            # if data['role'] == 'M':
-            #     Student.objects.create(user=user)
-            # elif data['role'] == 'E':
-            #     Teacher.objects.create(user=user)
             return Response({
                 'id': user.id,
                 'is_signed_up': True,
-                'is_logged_in': response.status_code == 200,
-                'token': response.json()['token'],
                 'message': 'OK',
             }, status=200)
         return Response({'is_signed_up': False,
@@ -51,6 +40,171 @@ class SignUp(APIView):
                          'token': '',
                          'message': user.errors,
                          }, status=403)
+
+
+class RegisterUser(APIView):
+    serializer_class = UserSerializer
+    permission_classes = (IsManager,)
+
+    def get_complete_role(self, role):
+        if role == 'M':
+            return 'manager'
+        if role == 'A':
+            return 'admin'
+        if role == 'E':
+            return 'employee'
+        return "unknown"
+
+    def post(self, request):
+        current_user_organization = request.user.manager.organization
+        data = {'username': request.data['username'], 'password': request.data['password'],
+                'organization': current_user_organization.id, 'first_name': request.data['first_name'],
+                'last_name': request.data['last_name'], 'role': 'E'}
+
+        # if 'manager' == request.data['role']:
+        #     data['role'] = 'M'
+        # if 'employee' == request.data['role']:
+        user = UserSerializer(data=data)
+        if user.is_valid():
+            user = user.save()
+            print(user.last_name)
+            if data['role'] == 'M':
+                Manager.objects.create(user=user, organization=current_user_organization)
+            elif data['role'] == 'E':
+                Employee.objects.create(user=user, organization=current_user_organization)
+            return Response({
+                'id': user.id,
+                'is_signed_up': True,
+                'message': 'OK',
+            }, status=200)
+        return Response({'is_signed_up': False,
+                         'message': user.errors,
+                         }, status=403)
+
+    def get(self, request, pk=None):
+        current_user_organization = request.user.manager.organization
+
+        if pk is None:
+            # Retrieve a list of all questions
+
+            employee_users = CustomUser.objects.filter(role='E').filter(
+                employee__organization=current_user_organization)
+            serializer = UserSafeSerializer(employee_users, many=True)
+            return Response(serializer.data)
+        else:
+            try:
+                employee_user = CustomUser.objects.get(pk=pk)
+            except CustomUser.DoesNotExist:
+                return Response({"detail": "user not found"}, status=404)
+
+            serializer = UserSafeSerializer(employee_user)
+            return Response(serializer.data)
+
+    def delete(self, request, pk):
+        user = get_object_or_404(CustomUser, id=pk)
+        if user.employee.organization != request.user.manager.organization:
+            return Response({
+                'message': 'you are not allowed to delete this user.',
+            }, status=403)
+
+        user.delete()
+        return Response({
+            'message': 'user deleted',
+            'id': request.user.id,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'username': user.username,
+        }, status=200)
+
+    def put(self, request, pk):
+        user = get_object_or_404(CustomUser, id=pk)
+        if user.employee.organization != request.user.manager.organization:
+            return Response({
+                'message': 'you are not allowed to edit this user.',
+            }, status=403)
+        user_serializer = UserSerializer(instance=user, data={k: v for k, v in request.data.items() if k != 'role'},
+                                         partial=True)
+        if user_serializer.is_valid():
+            user_serializer.save()
+            return Response({
+                'message': 'user data updated!',
+                'id': request.user.id,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'username': user.username,
+                'role': self.get_complete_role(user.role),
+            }, status=200)
+        return Response({
+            'message': 'something is wrong!',
+            'errors': user_serializer.errors
+        }, status=400)
+
+
+class RegisterManager(APIView):
+    serializer_class = UserSerializer
+    permission_classes = (IsAdmin,)
+
+    def get_complete_role(self, role):
+        if role == 'M':
+            return 'manager'
+        if role == 'A':
+            return 'admin'
+        if role == 'E':
+            return 'employee'
+        return "unknown"
+
+    def get(self, request):
+        managers = CustomUser.objects.filter(role='M')
+        serializer = ManagerSafeSerializer(managers, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+
+        data = {'username': request.data['username'], 'password': request.data['password'],
+                'organization': request.data['organization'], 'role': 'M',
+                'first_name': request.data['first_name'],
+                'last_name': request.data['last_name']}
+
+        user = UserSerializer(data=data)
+        organization_object = Organization.objects.get(name=data.get("organization"))
+
+        if user.is_valid():
+            user = user.save()
+
+            Manager.objects.create(user=user, organization=organization_object)
+            return Response({
+                'id': user.id,
+                'is_signed_up': True,
+                'message': 'OK',
+            }, status=200)
+        return Response({'is_signed_up': False,
+                         'token': '',
+                         'message': user.errors,
+                         }, status=403)
+
+    def put(self, request, pk):
+        user = get_object_or_404(CustomUser, id=pk)
+        user_serializer = UserSerializer(instance=user, data={k: v for k, v in request.data.items() if k != 'role'},
+                                         partial=True)
+        if user_serializer.is_valid():
+            user_serializer.save()
+            return Response({
+                'message': 'user data updated!',
+                'id': request.user.id,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'username': user.username,
+                'role': self.get_complete_role(user.role),
+            }, status=200)
+        return Response({
+            'message': 'something is wrong!',
+            'errors': user_serializer.errors
+        }, status=400)
+
+    def delete(self, request, pk):
+        user = get_object_or_404(CustomUser, id=pk)
+        user.delete()
+        return Response(status=204)
 
 
 class CustomLogin(ObtainAuthToken):
@@ -67,80 +221,57 @@ class CustomLogin(ObtainAuthToken):
             'id': 'null',
             'token': 'null',
         }, status=400)
-#
-#
-# class Profile(APIView):
-#     serializer_class = UserSerializer
-#     permission_classes = (IsAuthenticated,)
-#
-#     def get_complete_role(self, role):
-#         if role == 'M':
-#             return 'مدیر'
-#         if role == 'S':
-#             return 'دانش آموز / دانشجو'
-#         if role == 'T':
-#             return 'دبیر / استاد'
-#         return 'ادمین'
-#
-#     def file_handler(self, file, user_id, extension):
-#         # TODO: generate a random name to keep privacy
-#         with io.open(f'{IMAGES_LOCATION}/profilepic_{user_id}.{extension}', 'wb') as o:
-#             for b in file.readlines():
-#                 o.write(b)
-#                 o.flush()
-#         return f'profilepic_{user_id}.{extension}'
-#
-#     def get(self, request, **kwargs):
-#         user = get_object_or_404(CustomUser, username=request.user.username)
-#         filter_option = kwargs.get('filter_option', 'all')
-#         if filter_option == 'role':
-#             return Response({
-#                 'id': user.id,
-#                 'role': 'manager' if user.role == 'M' else (
-#                     'student' if user.role == 'S' else 'teacher' if user.role == 'T' else 'admin'),
-#             }, status=200)
-#         return Response({
-#             # TODO: add picture address
-#             'id': user.id,
-#             'first_name': user.first_name,
-#             'last_name': user.last_name,
-#             'username': user.username,
-#             'email': user.email,
-#             'address': user.address,
-#             'role': self.get_complete_role(user.role),
-#             'image': user.photo_link,
-#         }, status=200)
-#
-#     def put(self, request):
-#         user = get_object_or_404(CustomUser, username=request.user.username)
-#         user_serializer = UserSerializer(instance=user, data={k: v for k, v in request.data.items() if k != 'role'},
-#                                          partial=True)
-#         try:
-#             f = request.FILES.getlist('image')[0]
-#             photo_name = self.file_handler(f, request.user.username, f.name.split('.')[-1])
-#             user.set_photo_link(photo_name)
-#             user.save()
-#         except Exception:
-#             pass
-#         if user_serializer.is_valid():
-#             user_serializer.save()
-#             return Response({
-#                 'message': 'user data updated!',
-#                 # TODO: delete useless params
-#                 'id': request.user.id,
-#                 'first_name': user.first_name,
-#                 'last_name': user.last_name,
-#                 'username': user.username,
-#                 'email': user.email,
-#                 'address': user.address,
-#                 'role': self.get_complete_role(user.role),
-#                 'image': user.photo_link,
-#             }, status=200)
-#         return Response({
-#             'message': 'something is wrong!',
-#             'errors': user_serializer.errors
-#         }, status=400)
-#
+
+
+class Profile(APIView):
+    serializer_class = UserSerializer
+    permission_classes = (IsAuthenticated,)
+
+    def get_complete_role(self, role):
+        if role == 'M':
+            return 'manager'
+        if role == 'A':
+            return 'admin'
+        if role == 'E':
+            return 'employee'
+        return "unknown"
+
+    def get(self, request, **kwargs):
+        user = get_object_or_404(CustomUser, username=request.user.username)
+        filter_option = kwargs.get('filter_option', 'all')
+        if filter_option == 'role':
+            return Response({
+                'id': user.id,
+                'role': 'manager' if user.role == 'M' else (
+                    'admin' if user.role == 'A' else 'employee' if user.role == 'E' else 'unknown'),
+            }, status=200)
+        return Response({
+            'id': user.id,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'username': user.username,
+            'role': self.get_complete_role(user.role),
+        }, status=200)
+
+    def put(self, request):
+        user = get_object_or_404(CustomUser, username=request.user.username)
+        user_serializer = UserSerializer(instance=user, data={k: v for k, v in request.data.items() if k != 'role'},
+                                         partial=True)
+        if user_serializer.is_valid():
+            user_serializer.save()
+            return Response({
+                'message': 'user data updated!',
+                'id': request.user.id,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'username': user.username,
+                'role': self.get_complete_role(user.role),
+            }, status=200)
+        return Response({
+            'message': 'something is wrong!',
+            'errors': user_serializer.errors
+        }, status=400)
+
 
 class Logout(APIView):
     permission_classes = (IsAuthenticated,)
@@ -148,4 +279,4 @@ class Logout(APIView):
     def post(self, request):
         token = get_object_or_404(Token, user=request.user)
         token.delete()
-        return Response()
+        return Response({'message': 'logged out successfully.'}, status=200)

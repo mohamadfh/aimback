@@ -1,5 +1,13 @@
 from rest_framework.permissions import BasePermission
 from authentication.models import CustomUser
+from rest_framework import permissions
+
+
+class IsAdminOrManager(BasePermission):
+    message = 'You Aren\'t Admin or Organization\'s Manager!'
+
+    def has_permission(self, request, view):
+        return request.user.role == 'A' or request.user.role == 'M'
 
 
 class IsManager(BasePermission):
@@ -16,7 +24,6 @@ class IsEmployee(BasePermission):
         return request.user.role == 'E'
 
 
-
 class IsProfileCompleted(BasePermission):
     message = 'لطفا اطلاعات شخصی خود را تکمیل کنید.'
 
@@ -28,4 +35,14 @@ class IsAdmin(BasePermission):
     message = "YOU ARE NOT ADMIN!"
 
     def has_permission(self, request, view):
-        return request.user.is_superuser
+        return request.user.role == 'A'
+
+
+class IsAdminOrReadOnly(permissions.BasePermission):
+    def has_permission(self, request, view):
+        # Allow GET requests to all users
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # Check if the user has the "isAdmin" permission
+        return request.user and request.user.role == 'A'

@@ -12,7 +12,7 @@ class CustomUser(AbstractUser):
 
     @property
     def fullname(self):
-        return self.first_name + ' ' + self.last_name
+        return self.first_name + ' ' + self.last_name + " ," + self.username
 
     def is_completed(self):
         return self.first_name != '' and self.first_name is not None \
