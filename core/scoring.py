@@ -25,7 +25,7 @@ def calculate_block_score(choices_count):
         total_score += choice_score[choice] * choices_count[choice]
         submission_count += choices_count[choice]
     if submission_count != 0:
-        return round(total_score / submission_count , 2)
+        return round(total_score / submission_count, 2)
     else:
         return 0
 
@@ -35,4 +35,6 @@ def calculate_total_score(block_score):
     for block in block_score:
         total_score += block_score[block] * block_weight[block]
     total_score = 100 * (1 - total_score)
-    return round(total_score , 2)
+    return round(total_score, 2)
+
+
