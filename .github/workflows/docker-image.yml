@@ -17,8 +17,6 @@ jobs:
       run: sudo apt-get install dos2unix
     - name: Build and push Docker images
       run: |
-        dos2unix entrypoint.sh
-        chmod +x entrypoint.sh
         docker build -t allyellow/aimb .
         docker push allyellow/aimb
     - name: List Files
