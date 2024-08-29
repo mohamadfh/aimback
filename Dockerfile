@@ -17,9 +17,5 @@ RUN pip install -r requirements.txt
 # copy project
 COPY . .
 
-RUN sed -i 's/\r$//g' /usr/src/app/entrypoint.sh
-
-RUN chmod a+x /usr/src/app/entrypoint.sh
-
 # run entrypoint.sh
-ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
+CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
