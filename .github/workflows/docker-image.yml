@@ -17,7 +17,7 @@ jobs:
       run: sudo apt-get install dos2unix
     - name: Build and push Docker images
       run: |
-        docker build -t allyellow/aimb .
-        docker push allyellow/aimb
+        docker build -t allyellow/aimb2 .
+        docker push allyellow/aimb2
     - name: List Files
       run: ls -ltrh
