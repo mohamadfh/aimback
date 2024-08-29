@@ -16,6 +16,7 @@ jobs:
 
     - name: Build and push Docker images
       run: |
-        chmod +x entrypoint.sh
+        chmod a+x ./entrypoint.sh
+        chmod a+x entrypoint.sh
         docker build -t allyellow/aimb .
         docker push allyellow/aimb
